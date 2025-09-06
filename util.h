@@ -26,7 +26,7 @@
 
 #include <stdint.h>
 
-double gettime(void);
+uint64_t gettime(void);
 double fmin(double, double);
 
 void aligned_block_copy(int64_t * __restrict dst,

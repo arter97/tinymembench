@@ -85,7 +85,7 @@ static double bandwidth_bench_helper(int64_t *dstbuf, int64_t *srcbuf,
                                      const char *description)
 {
     int i, j, loopcount, innerloopcount, n;
-    double t1, t2;
+    uint64_t t1, t2;
     double speed, maxspeed;
     double s, s0, s1, s2;
 
@@ -121,8 +121,11 @@ static double bandwidth_bench_helper(int64_t *dstbuf, int64_t *srcbuf,
             }
             innerloopcount *= 2;
             t2 = gettime();
-        } while (t2 - t1 < 0.5);
-        speed = (double)size * loopcount / (t2 - t1) / 1000000.;
+        } while ((t2 - t1) < 500000000ULL);
+        {
+            double elapsed_s = (double)(t2 - t1) / 1000000000.0;
+            speed = (double)size * loopcount / elapsed_s / 1000000.;
+        }
 
         s0 += 1;
         s1 += speed;
@@ -377,7 +380,7 @@ static uint32_t rand32()
 
 int latency_bench(int size, int count, int use_hugepage)
 {
-    double t, t2, t_before, t_after, t_noaccess, t_noaccess2;
+    double t, t2, t_noaccess, t_noaccess2;
     double xs, xs0, xs1, xs2;
     double ys, ys0, ys1, ys2;
     double min_t, min_t2;
@@ -407,17 +410,23 @@ int latency_bench(int size, int count, int use_hugepage)
 
     for (n = 1; n <= MAXREPEATS; n++)
     {
-        t_before = gettime();
+        uint64_t t_before_ns = gettime();
         random_read_test(buffer, count, 1);
-        t_after = gettime();
-        if (n == 1 || t_after - t_before < t_noaccess)
-            t_noaccess = t_after - t_before;
+        uint64_t t_after_ns = gettime();
+        {
+            double elapsed_s = (double)(t_after_ns - t_before_ns) / 1000000000.0;
+            if (n == 1 || elapsed_s < t_noaccess)
+                t_noaccess = elapsed_s;
+        }
 
-        t_before = gettime();
+        t_before_ns = gettime();
         random_dual_read_test(buffer, count, 1);
-        t_after = gettime();
-        if (n == 1 || t_after - t_before < t_noaccess2)
-            t_noaccess2 = t_after - t_before;
+        t_after_ns = gettime();
+        {
+            double elapsed_s = (double)(t_after_ns - t_before_ns) / 1000000000.0;
+            if (n == 1 || elapsed_s < t_noaccess2)
+                t_noaccess2 = elapsed_s;
+        }
     }
 
     printf("\nblock size : single random read / dual random read");
@@ -443,10 +452,10 @@ int latency_bench(int size, int count, int use_hugepage)
              */
             int testoffs = (rand32() % (size / testsize)) * testsize;
 
-            t_before = gettime();
+            uint64_t t_before_ns = gettime();
             random_read_test(buffer + testoffs, count, nbits);
-            t_after = gettime();
-            t = t_after - t_before - t_noaccess;
+            uint64_t t_after_ns = gettime();
+            t = (double)(t_after_ns - t_before_ns) / 1000000000.0 - t_noaccess;
             if (t < 0) t = 0;
 
             xs1 += t;
@@ -455,10 +464,10 @@ int latency_bench(int size, int count, int use_hugepage)
             if (n == 1 || t < min_t)
                 min_t = t;
 
-            t_before = gettime();
+            t_before_ns = gettime();
             random_dual_read_test(buffer + testoffs, count, nbits);
-            t_after = gettime();
-            t2 = t_after - t_before - t_noaccess2;
+            t_after_ns = gettime();
+            t2 = (double)(t_after_ns - t_before_ns) / 1000000000.0 - t_noaccess2;
             if (t2 < 0) t2 = 0;
 
             ys1 += t2;

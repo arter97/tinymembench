@@ -25,7 +25,7 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <sys/time.h>
+#include <time.h>
 
 #include "util.h"
 
@@ -297,11 +297,15 @@ void aligned_block_fill_shuffle64(int64_t * __restrict dst_,
     }
 }
 
-double gettime(void)
+uint64_t gettime(void)
 {
-    struct timeval tv;
-    gettimeofday (&tv, NULL);
-    return (double)((int64_t)tv.tv_sec * 1000000 + tv.tv_usec) / 1000000.;
+    struct timespec ts;
+#ifdef CLOCK_MONOTONIC_RAW
+    clock_gettime(CLOCK_MONOTONIC_RAW, &ts);
+#else
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+#endif
+    return (uint64_t)ts.tv_sec * 1000000000ull + (uint64_t)ts.tv_nsec;
 }
 
 double fmin(double a, double b)
