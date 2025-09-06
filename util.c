@@ -25,7 +25,10 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <sys/mman.h>
 #include <time.h>
+#include <fcntl.h>
+#include <unistd.h>
 
 #include "util.h"
 
@@ -321,10 +324,43 @@ static char *align_up(char *ptr, int align)
     return (char *)(((uintptr_t)ptr + align - 1) & ~(uintptr_t)(align - 1));
 }
 
+void *alloc_hugepage(size_t size, size_t *size_2mb_aligned)
+{
+    void *ret;
+    *size_2mb_aligned = (size + 2 * 1024 * 1024 - 1) & ~(2 * 1024 * 1024 - 1);
+
+    printf("size: %zu\n", size);
+    printf("size_2mb_aligned: %zu\n", *size_2mb_aligned);
+
+    int fd = open(HUGEPAGE_PATH, O_CREAT | O_RDWR, 0600);
+    if (fd >= 0) {
+        unlink(HUGEPAGE_PATH);
+        if (ftruncate(fd, *size_2mb_aligned) != 0) {
+            perror("ftruncate");
+            exit(1);
+        }
+        ret = mmap(NULL, *size_2mb_aligned, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+        if (ret != MAP_FAILED && ret != NULL) {
+            printf("mmap succeeded\n");
+        } else {
+            // Error, exit
+            perror("mmap");
+            exit(1);
+        }
+        close(fd);
+    } else {
+        // Error, exit
+        perror("open");
+        exit(1);
+    }
+    return ret;
+}
+
 void *alloc_four_nonaliased_buffers(void **buf1_, int size1,
                                     void **buf2_, int size2,
                                     void **buf3_, int size3,
-                                    void **buf4_, int size4)
+                                    void **buf4_, int size4,
+                                    size_t *size_2mb_aligned)
 {
     char **buf1 = (char **)buf1_, **buf2 = (char **)buf2_;
     char **buf3 = (char **)buf3_, **buf4 = (char **)buf4_;
@@ -343,8 +379,11 @@ void *alloc_four_nonaliased_buffers(void **buf1_, int size1,
 
     printf("%s: alloc size: %zu\n", __func__, size);
 
-    ptr = buf =
-        (char *)malloc(size1 + size2 + size3 + size4 + 9 * ALIGN_PADDING);
+    ptr = buf = alloc_hugepage(size, size_2mb_aligned);
+    printf("%s: size_2mb_aligned: %zu\n", __func__, *size_2mb_aligned);
+
+    // ptr = buf =
+    //     (char *)malloc(size1 + size2 + size3 + size4 + 9 * ALIGN_PADDING);
     memset(buf, 0xCC, size1 + size2 + size3 + size4 + 9 * ALIGN_PADDING);
 
     ptr = align_up(ptr, ALIGN_PADDING);

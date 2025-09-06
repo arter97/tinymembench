@@ -25,6 +25,9 @@
 #define __UTIL_H__
 
 #include <stdint.h>
+#include <stddef.h>
+
+#define HUGEPAGE_PATH "/dev/hugepages/tinymembench"
 
 uint64_t gettime(void);
 double fmin(double, double);
@@ -66,6 +69,9 @@ void aligned_block_fill_shuffle64(int64_t * __restrict dst,
 void *alloc_four_nonaliased_buffers(void **buf1, int size1,
                                     void **buf2, int size2,
                                     void **buf3, int size3,
-                                    void **buf4, int size4);
+                                    void **buf4, int size4,
+                                    size_t *size_2mb_aligned);
+
+void *alloc_hugepage(size_t size, size_t *size_2mb_aligned);
 
 #endif

@@ -378,7 +378,7 @@ static uint32_t rand32()
     return (hi << 16) + lo;
 }
 
-int latency_bench(int size, int count, int use_hugepage)
+int latency_bench(int size, int count)
 {
     double t, t2, t_noaccess, t_noaccess2;
     double xs, xs0, xs1, xs2;
@@ -386,26 +386,10 @@ int latency_bench(int size, int count, int use_hugepage)
     double min_t, min_t2;
     int nbits, n;
     char *buffer, *buffer_alloc;
-#if !defined(__linux__) || !defined(MADV_HUGEPAGE)
-    if (use_hugepage)
-        return 0;
-    printf("%s: alloc size: %d\n", __func__, size + 4095);
-    buffer_alloc = (char *)malloc(size + 4095);
-    if (!buffer_alloc)
-        return 0;
-    buffer = (char *)(((uintptr_t)buffer_alloc + 4095) & ~(uintptr_t)4095);
-#else
-    printf("%s: alloc size: %d\n", __func__, size);
-    if (posix_memalign((void **)&buffer_alloc, 4 * 1024 * 1024, size) != 0)
-        return 0;
-    buffer = buffer_alloc;
-    if (use_hugepage && madvise(buffer, size, use_hugepage > 0 ?
-                                MADV_HUGEPAGE : MADV_NOHUGEPAGE) != 0)
-    {
-        free(buffer_alloc);
-        return 0;
-    }
-#endif
+    size_t size_2mb_aligned;
+
+    buffer = buffer_alloc = alloc_hugepage(size, &size_2mb_aligned);
+
     memset(buffer, 0, size);
 
     for (n = 1; n <= MAXREPEATS; n++)
@@ -430,12 +414,7 @@ int latency_bench(int size, int count, int use_hugepage)
     }
 
     printf("\nblock size : single random read / dual random read");
-    if (use_hugepage > 0)
-        printf(", [MADV_HUGEPAGE]\n");
-    else if (use_hugepage < 0)
-        printf(", [MADV_NOHUGEPAGE]\n");
-    else
-        printf("\n");
+    printf("\n");
 
     for (nbits = 10; (1 << nbits) <= size; nbits++)
     {
@@ -487,7 +466,7 @@ int latency_bench(int size, int count, int use_hugepage)
         printf("%10d : %6.1f ns          /  %6.1f ns \n", (1 << nbits),
             min_t * 1000000000. / count,  min_t2 * 1000000000. / count);
     }
-    free(buffer_alloc);
+    munmap(buffer_alloc, size_2mb_aligned);
     return 1;
 }
 
@@ -497,6 +476,7 @@ int main(void)
     int64_t *srcbuf, *dstbuf, *tmpbuf;
     void *poolbuf;
     size_t bufsize = SIZE;
+    size_t size_2mb_aligned;
 #ifdef __linux__
     size_t fbsize = 0;
     int64_t *fbbuf = mmap_framebuffer(&fbsize);
@@ -509,7 +489,8 @@ int main(void)
     poolbuf = alloc_four_nonaliased_buffers((void **)&srcbuf, bufsize,
                                             (void **)&dstbuf, bufsize,
                                             (void **)&tmpbuf, BLOCKSIZE,
-                                            NULL, 0);
+                                            NULL, 0,
+                                            &size_2mb_aligned);
     printf("\n");
     printf("==========================================================================\n");
     printf("== Memory bandwidth tests                                               ==\n");
@@ -525,7 +506,7 @@ int main(void)
     printf("==         brackets                                                     ==\n");
     printf("==========================================================================\n\n");
 
-#if 0
+#if 1
     bandwidth_bench(dstbuf, srcbuf, tmpbuf, bufsize, BLOCKSIZE, " ", c_benchmarks);
     printf(" ---\n");
     bandwidth_bench(dstbuf, srcbuf, tmpbuf, bufsize, BLOCKSIZE, " ", libc_benchmarks);
@@ -568,7 +549,7 @@ int main(void)
     }
 #endif
 
-    free(poolbuf);
+    munmap(poolbuf, size_2mb_aligned);
 
     printf("\n");
     printf("==========================================================================\n");
@@ -592,11 +573,7 @@ int main(void)
     printf("==         single reads performed one after another.                    ==\n");
     printf("==========================================================================\n");
 
-    if (!latency_bench(latbench_size, latbench_count, -1) ||
-        !latency_bench(latbench_size, latbench_count, 1))
-    {
-        latency_bench(latbench_size, latbench_count, 0);
-    }
+    latency_bench(latbench_size, latbench_count);
 
     return 0;
 }
