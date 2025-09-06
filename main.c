@@ -386,11 +386,13 @@ int latency_bench(int size, int count, int use_hugepage)
 #if !defined(__linux__) || !defined(MADV_HUGEPAGE)
     if (use_hugepage)
         return 0;
+    printf("%s: alloc size: %d\n", __func__, size + 4095);
     buffer_alloc = (char *)malloc(size + 4095);
     if (!buffer_alloc)
         return 0;
     buffer = (char *)(((uintptr_t)buffer_alloc + 4095) & ~(uintptr_t)4095);
 #else
+    printf("%s: alloc size: %d\n", __func__, size);
     if (posix_memalign((void **)&buffer_alloc, 4 * 1024 * 1024, size) != 0)
         return 0;
     buffer = buffer_alloc;
@@ -514,6 +516,7 @@ int main(void)
     printf("==         brackets                                                     ==\n");
     printf("==========================================================================\n\n");
 
+#if 0
     bandwidth_bench(dstbuf, srcbuf, tmpbuf, bufsize, BLOCKSIZE, " ", c_benchmarks);
     printf(" ---\n");
     bandwidth_bench(dstbuf, srcbuf, tmpbuf, bufsize, BLOCKSIZE, " ", libc_benchmarks);
@@ -522,8 +525,9 @@ int main(void)
         printf(" ---\n");
         bandwidth_bench(dstbuf, srcbuf, tmpbuf, bufsize, BLOCKSIZE, " ", bi);
     }
+#endif
 
-#ifdef __linux__
+#if 0
     bi = get_asm_framebuffer_benchmarks();
     if (bi->f && fbbuf)
     {

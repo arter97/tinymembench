@@ -23,6 +23,7 @@
 
 #include <string.h>
 #include <stdint.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <sys/time.h>
 
@@ -325,6 +326,7 @@ void *alloc_four_nonaliased_buffers(void **buf1_, int size1,
     char **buf3 = (char **)buf3_, **buf4 = (char **)buf4_;
     int antialias_pattern_mask = (ALIGN_PADDING - 1) & ~(CACHE_LINE_SIZE - 1);
     char *buf, *ptr;
+    size_t size = size1 + size2 + size3 + size4 + 9 * ALIGN_PADDING;
 
     if (!buf1 || size1 < 0)
         size1 = 0;
@@ -335,7 +337,9 @@ void *alloc_four_nonaliased_buffers(void **buf1_, int size1,
     if (!buf4 || size4 < 0)
         size4 = 0;
 
-    ptr = buf = 
+    printf("%s: alloc size: %zu\n", __func__, size);
+
+    ptr = buf =
         (char *)malloc(size1 + size2 + size3 + size4 + 9 * ALIGN_PADDING);
     memset(buf, 0xCC, size1 + size2 + size3 + size4 + 9 * ALIGN_PADDING);
 
